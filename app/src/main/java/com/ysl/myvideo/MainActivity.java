@@ -1,9 +1,10 @@
 package com.ysl.myvideo;
 
-import android.Manifest;
 import android.Manifest.permission;
 import android.content.Context;
+import android.content.pm.ActivityInfo;
 import android.graphics.SurfaceTexture;
+import android.hardware.SensorManager;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.media.MediaPlayer.OnCompletionListener;
@@ -12,10 +13,13 @@ import android.media.MediaPlayer.OnPreparedListener;
 import android.media.MediaPlayer.OnSeekCompleteListener;
 import android.net.Uri;
 import android.os.Environment;
+import android.provider.Settings;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.PermissionChecker;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.Log;
+import android.view.OrientationEventListener;
 import android.view.Surface;
 import android.view.TextureView;
 import android.view.TextureView.SurfaceTextureListener;
@@ -30,10 +34,12 @@ import butterknife.OnClick;
 
 public class MainActivity extends AppCompatActivity {
 
+    private static final String TAG = "tag";
     @BindView(R.id.textureView)
     TextureView textureView;
 
     private String path = Environment.getExternalStorageDirectory().getAbsolutePath()+"/DCIM/Camera/VID_20180325_212926.mp4";
+    private OrientationEventListener orientationEventListener;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -44,6 +50,40 @@ public class MainActivity extends AppCompatActivity {
         initMediaPlayer();
         initTextureView();
         textureView.setSurfaceTextureListener(surfaceTextureListener);
+
+        orientationEventListener = new OrientationEventListener(this, SensorManager.SENSOR_DELAY_NORMAL) {
+            @Override
+            public void onOrientationChanged(int orientation) {
+                Toast.makeText(MainActivity.this, "Orientation changed to " + orientation, Toast.LENGTH_SHORT).show();
+                int screenOrientation = getResources().getConfiguration().orientation;
+                if (((orientation >= 0) && (orientation < 45)) || (orientation > 315)) {//设置竖屏
+                    if (screenOrientation != ActivityInfo.SCREEN_ORIENTATION_PORTRAIT && orientation != ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT) {
+                        Log.d(TAG, "设置竖屏");
+                        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+                    }
+                } else if (orientation > 225 && orientation < 315) { //设置横屏
+                    Log.d(TAG, "设置横屏");
+                    if (screenOrientation != ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE) {
+                        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+                    }
+                } else if (orientation > 45 && orientation < 135) {// 设置反向横屏
+                    Log.d(TAG, "反向横屏");
+                    if (screenOrientation != ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE) {
+                        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE);
+                    }
+                } else if (orientation > 135 && orientation < 225) {
+                    Log.d(TAG, "反向竖屏");
+                    if (screenOrientation != ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT) {
+                        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT);
+                    }
+                }
+            }
+        };
+        boolean autoRotateOn = (android.provider.Settings.System.getInt(getContentResolver(), Settings.System.ACCELEROMETER_ROTATION, 0) == 1);
+        //检查系统是否开启自动旋转
+        if (autoRotateOn) {
+            orientationEventListener.enable();
+        }
     }
 
     private void initTextureView() {
@@ -208,4 +248,10 @@ public class MainActivity extends AppCompatActivity {
 
         }
     };
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        orientationEventListener.disable();
+    }
 }
